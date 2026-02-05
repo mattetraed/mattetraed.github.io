@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MatteTräd</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            overflow-x: hidden;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            text-align: center;
+            width: 100%;
+            max-width: 500px;
+        }
+
+        .question {
+            font-size: clamp(28px, 8vw, 48px);
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+
+        .status {
+            font-size: clamp(12px, 3.5vw, 18px);
+            margin-bottom: 15px;
+            padding: 8px 10px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            line-height: 2;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+
+        .feedback {
+            font-size: clamp(18px, 5vw, 28px);
+            font-weight: bold;
+            margin-bottom: 10px;
+            min-height: 30px;
+        }
+
+        .feedback.correct {
+            color: #4ade80;
+        }
+
+        .feedback.wrong {
+            color: #f87171;
+        }
+
+        .answers {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .answer-btn {
+            padding: clamp(12px, 4vw, 25px);
+            font-size: clamp(18px, 5vw, 32px);
+            font-weight: bold;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            color: white;
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .answer-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
+        }
+
+        .answer-btn:active {
+            transform: scale(0.95);
+        }
+
+        .win-message {
+            font-size: clamp(20px, 6vw, 36px);
+            font-weight: bold;
+            margin-top: 15px;
+        }
+
+        .restart-btn {
+            margin-top: 15px;
+            padding: 12px 25px;
+            font-size: clamp(16px, 4vw, 20px);
+            background: rgba(255, 255, 255, 0.3);
+            border: 2px solid white;
+            border-radius: 10px;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .restart-btn:hover {
+            background: rgba(255, 255, 255, 0.4);
+        }
+
+        .level-btn {
+            margin: 2px;
+            padding: 8px 12px;
+            font-size: clamp(16px, 4vw, 20px);
+            background: rgba(255, 255, 255, 0.3);
+            border: 2px solid white;
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+            display: inline-block;
+        }
+
+        .level-btn:hover {
+            background: rgba(255, 255, 255, 0.4);
+        }
+
+        .pin-screen {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .pin-screen.active {
+            display: flex;
+        }
+
+        .pin-container {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            width: 90%;
+            max-width: 350px;
+        }
+
+        .pin-title {
+            font-size: clamp(18px, 5vw, 24px);
+            margin-bottom: 15px;
+        }
+
+        .pin-display {
+            font-size: clamp(32px, 8vw, 48px);
+            margin: 15px 0;
+            letter-spacing: clamp(10px, 3vw, 20px);
+            min-height: 50px;
+        }
+
+        .pin-keypad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            max-width: 280px;
+            margin: 0 auto;
+        }
+
+        .pin-key {
+            padding: clamp(15px, 4vw, 25px);
+            font-size: clamp(24px, 6vw, 32px);
+            font-weight: bold;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: white;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .pin-key:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
+        }
+
+        .pin-key:active {
+            transform: scale(0.95);
+        }
+
+        .pin-error {
+            color: #f87171;
+            font-size: clamp(14px, 3.5vw, 16px);
+            margin-top: 10px;
+            min-height: 20px;
+            padding: 0 10px;
+        }
+
+        .game-container {
+            display: none;
+        }
+
+        .game-container.active {
+            display: block;
+        }
+
+        .game-title {
+            font-size: clamp(24px, 7vw, 36px);
+            font-weight: bold;
+            margin-bottom: 15px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <!-- PIN Setup Screen -->
+    <div id="pinSetupScreen" class="pin-screen active">
+        <div class="pin-container">
+            <div class="pin-title">Skapa PIN-kod (4 siffror)</div>
+            <div class="pin-display" id="setupPinDisplay">****</div>
+            <div class="pin-keypad" id="setupKeypad"></div>
+            <div class="pin-error" id="setupError"></div>
+        </div>
+    </div>
+
+    <!-- PIN Verify Screen -->
+    <div id="pinVerifyScreen" class="pin-screen">
+        <div class="pin-container">
+            <div class="pin-title">Ange PIN-kod för att fortsätta</div>
+            <div class="pin-display" id="verifyPinDisplay">****</div>
+            <div class="pin-keypad" id="verifyKeypad"></div>
+            <div class="pin-error" id="verifyError"></div>
+        </div>
+    </div>
+
+    <!-- Game Container -->
+    <div class="game-container" id="gameContainer">
+        <div class="container">
+            <h1 class="game-title">MatteTräd</h1>
+            <div class="status">
+                <span>Nivå: <span id="level">1</span> |</span>
+                <span>Status: <span id="counter">0</span>/<span id="required">6</span> rätt</span>
+                <span>
+                    <button class="level-btn" onclick="decreaseLevel()">⬇️</button>
+                    <button class="level-btn" onclick="increaseLevel()">⬆️</button>
+                </span>
+            </div>
+            <div class="question" id="question">5 - 2 = ?</div>
+            <div class="feedback" id="feedback"></div>
+            <div class="answers" id="answers"></div>
+            <div id="winMessage"></div>
+        </div>
+    </div>
+
+    <script>
+        let level = 1;
+        let MAX = 6;
+        let REQUIRED_CORRECT = 6;
+        let correctCounter = 0;
+        let currentAnswer = 0;
+        let gameOver = false;
+        
+        // PIN management
+        let savedPin = null;
+        let setupPin = '';
+        let setupConfirmPin = '';
+        let verifyPin = '';
+        let isConfirmingSetup = false;
+
+        function generateQuestion() {
+            if (gameOver) return;
+
+            // Generate a between MAX and 100 (or higher if MAX > 100)
+            const maxA = Math.max(100, MAX + 20); // Ensure we have range even at high levels
+            const a = Math.floor(Math.random() * (maxA - MAX + 1)) + MAX;
+            
+            // Generate b between 0 and MAX, but never larger than a
+            const maxB = Math.min(MAX, a);
+            const b = Math.floor(Math.random() * (maxB + 1));
+            
+            currentAnswer = a - b;
+            
+            console.log(`Genererat: ${a} - ${b} = ${currentAnswer} (MAX=${MAX}, always positive!)`);
+            
+            document.getElementById('question').textContent = `${a} - ${b} = ?`;
+            
+            generateAnswerOptions();
+        }
+
+        function generateAnswerOptions() {
+            const answers = new Set();
+            answers.add(currentAnswer);
+            
+            // Generate 7 other unique wrong answers
+            while (answers.size < 8) {
+                const offset = Math.floor(Math.random() * 21) - 10; // -10 to +10
+                const wrongAnswer = currentAnswer + offset;
+                if (wrongAnswer >= 0 && wrongAnswer <= 100) {
+                    answers.add(wrongAnswer);
+                }
+            }
+            
+            // Convert to array and shuffle
+            const answerArray = Array.from(answers).sort(() => Math.random() - 0.5);
+            
+            // Create buttons
+            const answersDiv = document.getElementById('answers');
+            answersDiv.innerHTML = '';
+            
+            answerArray.forEach(answer => {
+                const btn = document.createElement('button');
+                btn.className = 'answer-btn';
+                btn.textContent = answer;
+                btn.onclick = () => checkAnswer(answer);
+                answersDiv.appendChild(btn);
+            });
+        }
+
+        function checkAnswer(answer) {
+            if (gameOver) return;
+
+            const feedback = document.getElementById('feedback');
+            
+            if (answer === currentAnswer) {
+                feedback.textContent = 'Rätt!';
+                feedback.className = 'feedback correct';
+                correctCounter++;
+            } else {
+                feedback.textContent = `Fel! Rätt svar är ${currentAnswer}`;
+                feedback.className = 'feedback wrong';
+                correctCounter = Math.max(0, correctCounter - 1);
+            }
+            
+            document.getElementById('counter').textContent = correctCounter;
+            
+            if (correctCounter === REQUIRED_CORRECT) {
+                gameOver = true;
+                document.getElementById('winMessage').innerHTML = `
+                    <div class="win-message">🎉 Grattis! Du klarade nivå ${level}!</div>
+                    <button class="restart-btn" onclick="nextLevel()">Nästa nivå ➡️</button>
+                `;
+                document.getElementById('answers').innerHTML = '';
+            } else {
+                setTimeout(() => {
+                    feedback.textContent = '';
+                    generateQuestion();
+                }, 1500);
+            }
+        }
+
+        function updateLevelDisplay() {
+            document.getElementById('level').textContent = level;
+            document.getElementById('required').textContent = REQUIRED_CORRECT;
+        }
+
+        function restartGame() {
+            correctCounter = 0;
+            gameOver = false;
+            document.getElementById('counter').textContent = '0';
+            document.getElementById('feedback').textContent = '';
+            document.getElementById('winMessage').innerHTML = '';
+            generateQuestion();
+        }
+
+        // PIN Functions
+        function createKeypad(containerId, onDigitClick) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            
+            for (let i = 1; i <= 9; i++) {
+                const btn = document.createElement('button');
+                btn.className = 'pin-key';
+                btn.textContent = i;
+                btn.onclick = () => onDigitClick(i.toString());
+                container.appendChild(btn);
+            }
+            
+            // Empty cell, 0, backspace
+            const emptyCell = document.createElement('div');
+            container.appendChild(emptyCell);
+            
+            const zeroBtn = document.createElement('button');
+            zeroBtn.className = 'pin-key';
+            zeroBtn.textContent = '0';
+            zeroBtn.onclick = () => onDigitClick('0');
+            container.appendChild(zeroBtn);
+            
+            const backBtn = document.createElement('button');
+            backBtn.className = 'pin-key';
+            backBtn.textContent = '⌫';
+            backBtn.onclick = () => onDigitClick('back');
+            container.appendChild(backBtn);
+        }
+
+        function setupDigitClick(digit) {
+            const errorDiv = document.getElementById('setupError');
+            errorDiv.textContent = '';
+            
+            if (digit === 'back') {
+                if (!isConfirmingSetup && setupPin.length > 0) {
+                    setupPin = setupPin.slice(0, -1);
+                    updateSetupDisplay();
+                } else if (isConfirmingSetup && setupConfirmPin.length > 0) {
+                    setupConfirmPin = setupConfirmPin.slice(0, -1);
+                    updateSetupDisplay();
+                }
+                return;
+            }
+            
+            if (!isConfirmingSetup) {
+                if (setupPin.length < 4) {
+                    setupPin += digit;
+                    updateSetupDisplay();
+                    
+                    if (setupPin.length === 4) {
+                        isConfirmingSetup = true;
+                        document.querySelector('#pinSetupScreen .pin-title').textContent = 'Bekräfta PIN-kod';
+                        updateSetupDisplay();
+                    }
+                }
+            } else {
+                if (setupConfirmPin.length < 4) {
+                    setupConfirmPin += digit;
+                    updateSetupDisplay();
+                    
+                    if (setupConfirmPin.length === 4) {
+                        if (setupPin === setupConfirmPin) {
+                            savedPin = setupPin;
+                            document.getElementById('pinSetupScreen').classList.remove('active');
+                            showPinVerifyScreen();
+                        } else {
+                            errorDiv.textContent = 'PIN-koderna matchar inte! Försök igen.';
+                            setupPin = '';
+                            setupConfirmPin = '';
+                            isConfirmingSetup = false;
+                            document.querySelector('#pinSetupScreen .pin-title').textContent = 'Skapa PIN-kod (4 siffror)';
+                            updateSetupDisplay();
+                        }
+                    }
+                }
+            }
+        }
+
+        function updateSetupDisplay() {
+            const pin = isConfirmingSetup ? setupConfirmPin : setupPin;
+            const display = '•'.repeat(pin.length) + '○'.repeat(4 - pin.length);
+            document.getElementById('setupPinDisplay').textContent = display;
+        }
+
+        function verifyDigitClick(digit) {
+            const errorDiv = document.getElementById('verifyError');
+            errorDiv.textContent = '';
+            
+            if (digit === 'back') {
+                if (verifyPin.length > 0) {
+                    verifyPin = verifyPin.slice(0, -1);
+                    updateVerifyDisplay();
+                }
+                return;
+            }
+            
+            if (verifyPin.length < 4) {
+                verifyPin += digit;
+                updateVerifyDisplay();
+                
+                if (verifyPin.length === 4) {
+                    if (verifyPin === savedPin) {
+                        document.getElementById('pinVerifyScreen').classList.remove('active');
+                        document.getElementById('gameContainer').classList.add('active');
+                        verifyPin = '';
+                        restartGame();
+                    } else {
+                        errorDiv.textContent = 'Fel PIN-kod! Försök igen.';
+                        verifyPin = '';
+                        updateVerifyDisplay();
+                    }
+                }
+            }
+        }
+
+        function updateVerifyDisplay() {
+            const display = '•'.repeat(verifyPin.length) + '○'.repeat(4 - verifyPin.length);
+            document.getElementById('verifyPinDisplay').textContent = display;
+        }
+
+        function showPinVerifyScreen() {
+            verifyPin = '';
+            updateVerifyDisplay();
+            document.getElementById('verifyError').textContent = '';
+            document.getElementById('gameContainer').classList.remove('active');
+            document.getElementById('pinVerifyScreen').classList.add('active');
+        }
+
+        function nextLevel() {
+            level++;
+            MAX = 5 + level;
+            REQUIRED_CORRECT = 5 + level;
+            updateLevelDisplay();
+            showPinVerifyScreen();
+        }
+
+        function increaseLevel() {
+            level++;
+            MAX = 5 + level;
+            REQUIRED_CORRECT = 5 + level;
+            updateLevelDisplay();
+            showPinVerifyScreen();
+        }
+
+        function decreaseLevel() {
+            if (level > 1) {
+                level--;
+                MAX = 5 + level;
+                REQUIRED_CORRECT = 5 + level;
+                updateLevelDisplay();
+                showPinVerifyScreen();
+            }
+        }
+
+        // Initialize
+        createKeypad('setupKeypad', setupDigitClick);
+        createKeypad('verifyKeypad', verifyDigitClick);
+        updateLevelDisplay();
+    </script>
+</body>
+</html>
