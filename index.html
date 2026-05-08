@@ -77,6 +77,7 @@
     <button class="btn" id="start-btn" onclick="start()">🔔 Start &amp; Enable Notifications</button>
     <button class="btn" onclick="testNow()" style="margin-left:8px;background:#555">Test now</button>
     <button class="btn" onclick="skipTopic()" style="margin-left:8px;background:#555">Next topic</button>
+    <button class="btn" id="notif-btn" onclick="toggleNotifications()" style="margin-left:8px;background:#555">🔕 Mute</button>
   </div>
 </main>
 
@@ -219,7 +220,15 @@ function logEvent(msg) {
   el.innerHTML = new Date().toLocaleTimeString() + ' — ' + msg + '<br>' + el.innerHTML;
 }
 
+let notificationsEnabled = true;
+
+function toggleNotifications() {
+  notificationsEnabled = !notificationsEnabled;
+  document.getElementById('notif-btn').textContent = notificationsEnabled ? '🔕 Mute' : '🔔 Unmute';
+}
+
 function notify(title, body) {
+  if (!notificationsEnabled) return;
   if (Notification.permission !== 'granted') { logEvent('skipped — ' + Notification.permission); return; }
   logEvent(title + ': ' + body);
   try {
