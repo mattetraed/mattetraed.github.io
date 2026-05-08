@@ -127,14 +127,24 @@ function topicNameFromPath(path) {
 }
 
 async function loadTopics() {
-  return Promise.all(CSV_FILES.map(async path => {
+  const results = await Promise.allSettled(CSV_FILES.map(async path => {
     const res = await fetch(path);
-    if (!res.ok) throw new Error('Failed to load ' + path);
+    if (!res.ok) throw new Error(path + ' (HTTP ' + res.status + ')');
     return { name: topicNameFromPath(path), entries: parseCsv(await res.text()) };
   }));
+  const failed = results.filter(r => r.status === 'rejected').map(r => r.reason.message);
+  if (failed.length) throw new Error('Missing files:\n' + failed.join('\n'));
+  return results.map(r => r.value);
 }
 
 let topics = [];
+let swReg = null;
+
+async function initSW() {
+  if ('serviceWorker' in navigator) {
+    try { swReg = await navigator.serviceWorker.register('sw.js'); } catch(e) {}
+  }
+}
 
 // Topic-aware pool
 let topicPools = [];
@@ -220,8 +230,13 @@ function logEvent(msg) {
 function notify(title, body) {
   if (Notification.permission !== 'granted') { logEvent('skipped — ' + Notification.permission); return; }
   logEvent(title + ': ' + body);
-  try { new Notification(title, { body, tag: Date.now().toString() }); }
-  catch(e) { logEvent('error: ' + e.message); }
+  try {
+    if (swReg) {
+      swReg.showNotification(title, { body, tag: Date.now().toString() });
+    } else {
+      new Notification(title, { body, tag: Date.now().toString() });
+    }
+  } catch(e) { logEvent('error: ' + e.message); }
 }
 
 function updateLabels() {
@@ -283,7 +298,7 @@ async function start() {
   tick();
 }
 
-loadTopics().then(loaded => {
+Promise.all([loadTopics(), initSW()]).then(([loaded]) => {
   topics = loaded;
   buildPools();
   document.getElementById('loading-card').style.display = 'none';
