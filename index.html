@@ -81,15 +81,6 @@
 </main>
 
 <script>
-// Add or remove CSV paths here to change which topics are loaded
-const CSV_FILES = [
-  'conditionals.csv',
-  'body_parts.csv',
-  'advanced_conditionals.csv',
-  'causatives.csv',
-  'modal_particles.csv'
-];
-
 function parseCsvLine(line) {
   const fields = [];
   let current = '';
@@ -127,10 +118,11 @@ function topicNameFromPath(path) {
 }
 
 async function loadTopics() {
-  const results = await Promise.allSettled(CSV_FILES.map(async path => {
-    const res = await fetch(path);
-    if (!res.ok) throw new Error(path + ' (HTTP ' + res.status + ')');
-    return { name: topicNameFromPath(path), entries: parseCsv(await res.text()) };
+  const files = await fetch('topics.json').then(r => r.json());
+  const results = await Promise.allSettled(files.map(async file => {
+    const res = await fetch(file);
+    if (!res.ok) throw new Error(file + ' (HTTP ' + res.status + ')');
+    return { name: topicNameFromPath(file), entries: parseCsv(await res.text()) };
   }));
   const failed = results.filter(r => r.status === 'rejected').map(r => r.reason.message);
   if (failed.length) throw new Error('Missing files:\n' + failed.join('\n'));
