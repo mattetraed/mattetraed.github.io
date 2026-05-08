@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Swedish Trainer</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #f0f4f0; color: #222; }
+  header { background: #1a6b3c; color: white; padding: 16px 24px; font-size: 1.3em; font-weight: bold; }
+
+  .card {
+    background: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.1);
+    padding: 24px; margin: 24px auto; max-width: 700px;
+  }
+
+  .card h2 { color: #1a6b3c; margin-bottom: 16px; font-size: 1em; text-transform: uppercase; letter-spacing: .05em; }
+
+  #current-hu { font-size: 1.5em; font-weight: bold; min-height: 1.8em; }
+  #current-sv { font-size: 1.2em; color: #1a6b3c; margin-top: 10px; min-height: 1.5em; font-style: italic; }
+  #countdown  { font-size: .85em; color: #999; margin-top: 12px; }
+  #status { font-size: .85em; margin-top: 12px; padding: 8px 10px; border-radius: 4px; background: #f5f5f5; }
+  #log { font-size: .8em; color: #666; margin-top: 8px; max-height: 80px; overflow-y: auto; }
+
+  .btn {
+    display: inline-block; margin-top: 16px; padding: 10px 22px;
+    background: #1a6b3c; color: white; border: none; border-radius: 6px;
+    cursor: pointer; font-size: .95em;
+  }
+  .btn:hover { background: #145530; }
+  .btn:disabled { background: #999; cursor: default; }
+
+  #topic-banner {
+    display: none; font-size: 1.1em; font-weight: bold; color: #1a6b3c;
+    background: #e8f5ee; border: 1px solid #a8d8bc; border-radius: 6px;
+    padding: 10px 14px; margin-top: 12px; text-align: center;
+  }
+
+  .slider-row { display: flex; align-items: center; gap: 12px; margin-top: 12px; font-size: .9em; }
+  .slider-row label { width: 160px; color: #555; }
+  .slider-row input[type=range] { flex: 1; accent-color: #1a6b3c; }
+  .slider-row span { width: 32px; text-align: right; font-weight: bold; }
+
+  main { padding: 0 24px 40px; }
+</style>
+</head>
+<body>
+
+<header>🇸🇪 Swedish Trainer</header>
+
+<main>
+  <div class="card" id="loading-card">
+    <div id="loading-msg">Loading topics…</div>
+  </div>
+
+  <div class="card" id="main-card" style="display:none">
+    <h2>Current Card</h2>
+    <div id="current-hu">Press "Start" to begin</div>
+    <div id="current-sv"></div>
+    <div id="countdown"></div>
+    <div id="topic-banner"></div>
+    <div id="status">Permission: checking…</div>
+    <div id="log"></div>
+    <div class="slider-row">
+      <label>Show answer after</label>
+      <input type="range" id="answer-delay" min="3" max="30" value="10" oninput="updateLabels()">
+      <span id="answer-delay-val">10s</span>
+    </div>
+    <div class="slider-row">
+      <label>Pause after answer</label>
+      <input type="range" id="pause-delay" min="3" max="30" value="5" oninput="updateLabels()">
+      <span id="pause-delay-val">5s</span>
+    </div>
+  </div>
+
+  <div id="btn-card" style="display:none; max-width:700px; margin: 0 auto; padding: 0 0 24px">
+    <button class="btn" id="start-btn" onclick="start()">🔔 Start &amp; Enable Notifications</button>
+    <button class="btn" onclick="testNow()" style="margin-left:8px;background:#555">Test now</button>
+    <button class="btn" onclick="skipTopic()" style="margin-left:8px;background:#555">Next topic</button>
+  </div>
+</main>
+
+<script>
+// Add or remove CSV paths here to change which topics are loaded
+const CSV_FILES = [
+  'conditionals.csv',
+  'body_parts.csv',
+  'advanced_conditionals.csv',
+  'causatives.csv',
+  'modal_particles.csv'
+];
+
+function parseCsvLine(line) {
+  const fields = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"' && !inQuotes) {
+      inQuotes = true;
+    } else if (c === '"' && inQuotes && line[i + 1] === '"') {
+      current += '"'; i++;
+    } else if (c === '"' && inQuotes) {
+      inQuotes = false;
+    } else if (c === ',' && !inQuotes) {
+      fields.push(current); current = '';
+    } else {
+      current += c;
+    }
+  }
+  fields.push(current);
+  return fields;
+}
+
+function parseCsv(text) {
+  return text.split('\n')
+    .map(l => l.trim())
+    .filter(l => l.length > 0)
+    .map(line => {
+      const [hungarian, swedish] = parseCsvLine(line);
+      return { hungarian, swedish };
+    });
+}
+
+function topicNameFromPath(path) {
+  return path.replace(/^.*\//, '').replace('.csv', '').replace(/_/g, ' ');
+}
+
+async function loadTopics() {
+  return Promise.all(CSV_FILES.map(async path => {
+    const res = await fetch(path);
+    if (!res.ok) throw new Error('Failed to load ' + path);
+    return { name: topicNameFromPath(path), entries: parseCsv(await res.text()) };
+  }));
+}
+
+let topics = [];
+
+// Topic-aware pool
+let topicPools = [];
+let topicIdx = -1;
+let entryIdx = 0;
+let currentTopicName = null;
+
+function buildPools() {
+  topicPools = [...topics].sort(() => Math.random() - 0.5)
+    .map(t => ({ name: t.name, entries: [...t.entries].sort(() => Math.random() - 0.5) }));
+}
+
+function nextEntryInfo() {
+  if (topicIdx === -1 || entryIdx >= topicPools[topicIdx].entries.length) {
+    topicIdx = topicIdx === -1 ? 0 : topicIdx + 1;
+    entryIdx = 0;
+    if (topicIdx >= topicPools.length) { buildPools(); topicIdx = 0; }
+  }
+  const isNewTopic = topicPools[topicIdx].name !== currentTopicName;
+  currentTopicName = topicPools[topicIdx].name;
+  return { entry: topicPools[topicIdx].entries[entryIdx++], isNewTopic };
+}
+
+// Timers — always cancel before scheduling a new cycle
+let answerTimer = null;
+let nextTimer   = null;
+let topicTimer  = null;
+let countdownTimer = null;
+let pendingAction = null; // { fn, at } — catches up when tab comes back to focus
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && pendingAction !== null && Date.now() >= pendingAction.at) {
+    const fn = pendingAction.fn;
+    cancelAll();
+    fn();
+  }
+});
+
+function cancelAll() {
+  clearTimeout(answerTimer);
+  clearTimeout(nextTimer);
+  clearTimeout(topicTimer);
+  clearInterval(countdownTimer);
+  pendingAction = null;
+}
+
+function playChime() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [523, 784].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = freq; osc.type = 'sine';
+      const t = ctx.currentTime + i * 0.2;
+      gain.gain.setValueAtTime(0.25, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+      osc.start(t); osc.stop(t + 0.4);
+    });
+  } catch(e) {}
+}
+
+function startCountdown(seconds, label) {
+  clearInterval(countdownTimer);
+  let remaining = seconds;
+  document.getElementById('countdown').textContent = label + ' ' + remaining + 's';
+  countdownTimer = setInterval(() => {
+    remaining--;
+    document.getElementById('countdown').textContent = label + ' ' + remaining + 's';
+    if (remaining <= 0) clearInterval(countdownTimer);
+  }, 1000);
+}
+
+function updateStatus() {
+  document.getElementById('status').textContent = 'Permission: ' + Notification.permission;
+}
+
+function logEvent(msg) {
+  const el = document.getElementById('log');
+  el.innerHTML = new Date().toLocaleTimeString() + ' — ' + msg + '<br>' + el.innerHTML;
+}
+
+function notify(title, body) {
+  if (Notification.permission !== 'granted') { logEvent('skipped — ' + Notification.permission); return; }
+  logEvent(title + ': ' + body);
+  try { new Notification(title, { body, tag: Date.now().toString() }); }
+  catch(e) { logEvent('error: ' + e.message); }
+}
+
+function updateLabels() {
+  document.getElementById('answer-delay-val').textContent = document.getElementById('answer-delay').value + 's';
+  document.getElementById('pause-delay-val').textContent  = document.getElementById('pause-delay').value  + 's';
+}
+function answerDelay() { return parseInt(document.getElementById('answer-delay').value) * 1000; }
+function pauseDelay()  { return parseInt(document.getElementById('pause-delay').value)  * 1000; }
+
+function revealAnswer(entry) {
+  document.getElementById('current-sv').textContent = '🇸🇪 ' + entry.swedish;
+  notify('🇸🇪 Answer', entry.swedish);
+  const delay = pauseDelay();
+  startCountdown(delay / 1000, 'Next card in');
+  pendingAction = { fn: tick, at: Date.now() + delay };
+  nextTimer = setTimeout(() => { pendingAction = null; tick(); }, delay);
+}
+
+function showCard(entry) {
+  document.getElementById('topic-banner').style.display = 'none';
+  document.getElementById('current-hu').textContent = '🇭🇺 ' + entry.hungarian;
+  document.getElementById('current-sv').textContent = '';
+  notify('🇭🇺 Translate this!', entry.hungarian);
+  const delay = answerDelay();
+  startCountdown(delay / 1000, 'Answer in');
+  pendingAction = { fn: () => revealAnswer(entry), at: Date.now() + delay };
+  answerTimer = setTimeout(() => { pendingAction = null; revealAnswer(entry); }, delay);
+}
+
+function tick() {
+  cancelAll();
+  const { entry, isNewTopic } = nextEntryInfo();
+  if (isNewTopic) {
+    playChime();
+    document.getElementById('topic-banner').textContent = '📚 New topic: ' + currentTopicName;
+    document.getElementById('topic-banner').style.display = 'block';
+    document.getElementById('current-hu').textContent = '';
+    document.getElementById('current-sv').textContent = '';
+    startCountdown(5, 'Starting in');
+    pendingAction = { fn: () => showCard(entry), at: Date.now() + 5000 };
+    topicTimer = setTimeout(() => { pendingAction = null; showCard(entry); }, 5000);
+  } else {
+    showCard(entry);
+  }
+}
+
+function testNow() { tick(); }
+
+function skipTopic() {
+  if (topicIdx >= 0) entryIdx = topicPools[topicIdx].entries.length;
+  tick();
+}
+
+async function start() {
+  document.getElementById('start-btn').disabled = true;
+  document.getElementById('start-btn').textContent = '✓ Running';
+  if (Notification.permission === 'default') await Notification.requestPermission();
+  updateStatus();
+  tick();
+}
+
+loadTopics().then(loaded => {
+  topics = loaded;
+  buildPools();
+  document.getElementById('loading-card').style.display = 'none';
+  document.getElementById('main-card').style.display = '';
+  document.getElementById('btn-card').style.display = '';
+  updateStatus();
+}).catch(err => {
+  document.getElementById('loading-msg').textContent = 'Error loading topics: ' + err.message;
+});
+</script>
+</body>
+</html>
